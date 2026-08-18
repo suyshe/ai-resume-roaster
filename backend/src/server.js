@@ -7,7 +7,6 @@ import { initDatabase } from './config/db.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
@@ -15,6 +14,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Gemini-Key']
 }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -34,26 +34,32 @@ app.get('/', (req, res) => {
   });
 });
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);
+
   res.status(err.status || 500).json({
     success: false,
     error: err.message || 'Internal Server Error'
   });
 });
 
-// Start server and initialize database
-async function startServer() {
-  await initDatabase();
+// Export for Vercel
+export default app;
 
-  app.listen(PORT, () => {
-    console.log(`=========================================`);
-    console.log(`Resume Roaster Backend Server Online`);
-    console.log(`Running at: http://localhost:${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/api/health`);
-    console.log(`=========================================`);
-  });
+// Local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+
+  initDatabase()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Resume Roaster Backend running at http://localhost:${PORT}`);
+        console.log(`Health check: http://localhost:${PORT}/api/health`);
+      });
+    })
+    .catch((error) => {
+      console.error('Failed to initialize database:', error);
+      process.exit(1);
+    });
 }
-
-startServer();
