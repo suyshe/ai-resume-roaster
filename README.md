@@ -30,6 +30,4 @@ Confetti
 
 Author
 Suyog Shete
-Portfolio: https://my-portfolio-jwvp-b5x3sm5qa-sush5.vercel.app/
-LinkedIn: https://www.linkedin.com/in/suyog-shete-b5b27a397
-GitHub: https://github.com/suyshe
+Portfolio: https://my-portfolio-jwvp-b5x3sm5qa-sush5.vercel.app/                          LinkedIn: https://www.linkedin.com/in/suyog-shete-b5b27a397
