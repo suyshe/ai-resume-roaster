@@ -53,10 +53,13 @@ if (process.env.NODE_ENV !== 'production') {
 
   initDatabase()
     .then(() => {
-      app.listen(PORT, () => {
-        console.log(`Resume Roaster Backend running at http://localhost:${PORT}`);
-        console.log(`Health check: http://localhost:${PORT}/api/health`);
-      });
+      app.listen(PORT, '0.0.0.0', () => {
+  console.log(`=========================================`);
+  console.log(`Resume Roaster Backend Server Online`);
+  console.log(`Running on port: ${PORT}`);
+  console.log(`Health check: /api/health`);
+  console.log(`=========================================`);
+});
     })
     .catch((error) => {
       console.error('Failed to initialize database:', error);
