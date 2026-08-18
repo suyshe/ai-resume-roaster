@@ -8,6 +8,8 @@ dotenv.config();
 
 const app = express();
 
+const PORT = process.env.PORT || 5000;
+
 // Middleware
 app.use(cors({
   origin: '*',
@@ -44,25 +46,24 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Export for Vercel
-export default app;
+// Start server
+async function startServer() {
+  try {
+    await initDatabase();
 
-// Local development
-if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 5000;
-
-  initDatabase()
-    .then(() => {
-      app.listen(PORT, '0.0.0.0', () => {
-  console.log(`=========================================`);
-  console.log(`Resume Roaster Backend Server Online`);
-  console.log(`Running on port: ${PORT}`);
-  console.log(`Health check: /api/health`);
-  console.log(`=========================================`);
-});
-    })
-    .catch((error) => {
-      console.error('Failed to initialize database:', error);
-      process.exit(1);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log('=========================================');
+      console.log('Resume Roaster Backend Server Online');
+      console.log(`Running on port: ${PORT}`);
+      console.log('Health check: /api/health');
+      console.log('=========================================');
     });
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  }
 }
+
+startServer();
+
+export default app;
