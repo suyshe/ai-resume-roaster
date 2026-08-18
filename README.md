@@ -29,6 +29,9 @@ Confetti
 **Feedback:** Formspree
 
 ## Author
+
 **Suyog Shete**
-**Portfolio:** [My Portfolio](https://my-portfolio-jwvp-b5x3sm5qa-sush5.vercel.app/)
+
+**Portfolio:** [Portfolio](https://my-portfolio-jwvp-b5x3sm5qa-sush5.vercel.app/)
+
 **LinkedIn:** [LinkedIn Profile](https://www.linkedin.com/in/suyog-shete-b5b27a397)
