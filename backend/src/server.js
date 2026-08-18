@@ -2,7 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import roastRoutes from './routes/roastRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 import { initDatabase } from './config/db.js';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
@@ -11,16 +13,43 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://ai-resume-roaster-jhod.vercel.app'
+];
+
 app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gemini-Key']
+  origin: (origin, callback) => {
+    // Allow requests without an Origin header
+    // such as curl/server-to-server requests.
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS: Origin not allowed'));
+    }
+  },
+  credentials: true
 }));
+
+const roastLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too many roast requests. Please try again later.'
+  }
+});
+
+app.use('/api/roast', roastLimiter);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Mount API routes
+app.use('/api/auth', authRoutes);
 app.use('/api', roastRoutes);
 
 // Root route

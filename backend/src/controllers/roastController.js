@@ -1,5 +1,5 @@
 import { ParserService } from '../services/parserService.js';
-import { GeminiService } from '../services/geminiService.js';
+import { ClaudeService } from '../services/claudeService.js';
 import { RoastModel, getDbStatus } from '../config/db.js';
 
 export const RoastController = {
@@ -8,10 +8,8 @@ export const RoastController = {
    */
   async roastResume(req, res) {
     try {
-      const { text, intensity = 'spicy', apiKey: bodyApiKey } = req.body;
+      const { text, intensity = 'spicy' } = req.body;
       const file = req.file;
-      const headerApiKey = req.headers['x-gemini-key'];
-      const userApiKey = headerApiKey || bodyApiKey;
 
       let extractedText = text || '';
       let imageBuffer = null;
@@ -46,28 +44,28 @@ export const RoastController = {
       console.log(`[Roast Request]: Processing ${inputType} input with ${intensity} intensity.`);
 
       // Run AI Roast Generation
-      const roastResult = await GeminiService.roastResume({
+      const roastResult = await ClaudeService.roastResume({
         text: extractedText,
         imageBuffer,
         imageMimeType,
-        intensity,
-        userApiKey
+        intensity
       });
 
       // Save to Storage / Database
       const savedRecord = await RoastModel.create({
-        title: roastResult.title || 'Resume Roast',
-        target_role: 'Candidate',
-        intensity,
-        input_type: inputType,
-        raw_text: extractedText,
-        savage_roast: roastResult.savage_roast,
-        one_liner: roastResult.one_liner,
-        overall_score: roastResult.overall_score,
-        red_flags: roastResult.flaws || [],
-        actionable_tips: roastResult.improvements || [],
-        rewritten_summary: roastResult.summary || ''
-      });
+  user_id: req.user.id,
+  title: roastResult.title || 'Resume Roast',
+  target_role: 'Candidate',
+  intensity,
+  input_type: inputType,
+  raw_text: extractedText,
+  savage_roast: roastResult.savage_roast,
+  one_liner: roastResult.one_liner,
+  overall_score: roastResult.overall_score,
+  red_flags: roastResult.flaws || [],
+  actionable_tips: roastResult.improvements || [],
+  rewritten_summary: roastResult.summary || ''
+});
 
       return res.status(200).json({
         success: true,
@@ -92,7 +90,7 @@ export const RoastController = {
   async getRoasts(req, res) {
     try {
       const limit = parseInt(req.query.limit) || 15;
-      const roasts = await RoastModel.getAll(limit);
+      const roasts = await RoastModel.getAll(req.user.id, limit);
       return res.status(200).json({
         success: true,
         data: roasts
@@ -111,7 +109,7 @@ export const RoastController = {
   async getRoastById(req, res) {
     try {
       const { id } = req.params;
-      const roast = await RoastModel.getById(id);
+      const roast = await RoastModel.getById(id, req.user.id);
       if (!roast) {
         return res.status(404).json({
           success: false,
@@ -140,7 +138,8 @@ export const RoastController = {
       service: 'AI Resume Roaster Backend',
       timestamp: new Date().toISOString(),
       database: dbStatus,
-      geminiConfigured: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== '')
+      claudeConfigured: Boolean(process.env.ANTHROPIC_API_KEY?.trim()),
+geminiConfigured: Boolean(process.env.GEMINI_API_KEY?.trim())
     });
   }
 };

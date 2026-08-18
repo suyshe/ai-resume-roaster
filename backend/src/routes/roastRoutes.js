@@ -1,36 +1,56 @@
 import express from 'express';
 import multer from 'multer';
+
 import { RoastController } from '../controllers/roastController.js';
+import { authenticate } from '../middleware/authenticate.js';
 
 const router = express.Router();
 
-// Configure multer memory storage
-const storage = multer.memoryStorage();
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
-    const allowedMimes = [
+    const allowedTypes = [
       'application/pdf',
-      'image/png',
       'image/jpeg',
-      'image/jpg',
+      'image/png',
       'image/webp'
     ];
-    if (allowedMimes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF, PNG, JPEG, or WEBP files are allowed.'));
+
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(
+        new Error('Only PDF, JPG, PNG, and WebP files are allowed.')
+      );
     }
+
+    cb(null, true);
   }
 });
 
-// API Routes
-router.post('/roast', upload.single('resumeFile'), RoastController.roastResume);
-router.get('/roasts', RoastController.getRoasts);
-router.get('/roasts/:id', RoastController.getRoastById);
-router.get('/health', RoastController.healthCheck);
+router.get(
+  '/health',
+  RoastController.healthCheck
+);
+
+router.post(
+  '/roast',
+  authenticate,
+  upload.single('resumeFile'),
+  RoastController.roastResume
+);
+
+router.get(
+  '/roasts',
+  authenticate,
+  RoastController.getRoasts
+);
+
+router.get(
+  '/roasts/:id',
+  authenticate,
+  RoastController.getRoastById
+);
 
 export default router;

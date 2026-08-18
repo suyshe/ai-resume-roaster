@@ -2,6 +2,8 @@
  * API Service for AI Resume Roaster
  */
 
+const TOKEN_KEY = 'resume_roaster_token';
+
 const API_URL =
   import.meta.env.VITE_API_URL ||
   'https://ai-resume-roaster-dpqw.onrender.com';
@@ -10,23 +12,35 @@ const getApiBase = () => {
   return `${API_URL}/api`;
 };
 
-const getStoredApiKey = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('gemini_api_key') || '';
-  }
-  return '';
-};
+/* =========================
+   AUTH TOKEN HELPERS
+========================= */
 
-/**
- * Safely executes a fetch request and parses JSON
- */
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+/* =========================
+   SAFE FETCH
+========================= */
+
 async function safeFetch(url, options = {}) {
-  const userKey = getStoredApiKey();
+  const headers = options.headers
+    ? { ...options.headers }
+    : {};
 
-  const headers = options.headers ? { ...options.headers } : {};
+  const token = getToken();
 
-  if (userKey && !headers['x-gemini-key']) {
-    headers['x-gemini-key'] = userKey;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   options.headers = headers;
@@ -36,6 +50,8 @@ async function safeFetch(url, options = {}) {
   try {
     response = await fetch(url, options);
   } catch (networkError) {
+    console.error('[API Network Error]:', networkError);
+
     throw new Error(
       'Cannot connect to the backend server. Please try again later.'
     );
@@ -44,13 +60,9 @@ async function safeFetch(url, options = {}) {
   const rawText = await response.text();
 
   if (!rawText || rawText.trim() === '') {
-    if (!response.ok) {
-      throw new Error(
-        `Server returned status ${response.status} with empty body.`
-      );
-    }
-
-    throw new Error('Server returned an empty response.');
+    throw new Error(
+      `Server returned status ${response.status} with empty body.`
+    );
   }
 
   let data;
@@ -59,8 +71,8 @@ async function safeFetch(url, options = {}) {
     data = JSON.parse(rawText);
   } catch (parseError) {
     console.error(
-      'Non-JSON response received:',
-      rawText.substring(0, 200)
+      '[API Parse Error]:',
+      rawText.substring(0, 500)
     );
 
     throw new Error(
@@ -70,22 +82,100 @@ async function safeFetch(url, options = {}) {
 
   if (!response.ok || !data.success) {
     throw new Error(
-      data.error || `Request failed with status ${response.status}`
+      data.error ||
+      `Request failed with status ${response.status}`
     );
   }
 
   return data;
 }
 
+/* =========================
+   API
+========================= */
+
 export const api = {
-  /**
-   * Submit a resume for roasting
-   */
-  async submitRoast({ text, file, intensity = 'spicy' }) {
+
+  /* =========================
+     REGISTER
+  ========================= */
+
+  async register(email, password) {
+    const data = await safeFetch(
+      `${getApiBase()}/auth/register`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      }
+    );
+
+    setToken(data.data.token);
+
+    return data.data;
+  },
+
+  /* =========================
+     LOGIN
+  ========================= */
+
+  async login(email, password) {
+    const data = await safeFetch(
+      `${getApiBase()}/auth/login`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      }
+    );
+
+    setToken(data.data.token);
+
+    return data.data;
+  },
+
+  /* =========================
+     LOGOUT
+  ========================= */
+
+  logout() {
+    clearToken();
+  },
+
+  /* =========================
+     AUTH STATUS
+  ========================= */
+
+  isAuthenticated() {
+    return Boolean(getToken());
+  },
+
+  /* =========================
+     SUBMIT ROAST
+  ========================= */
+
+  async submitRoast({
+    text = '',
+    file = null,
+    intensity = 'spicy',
+  }) {
     const apiBase = getApiBase();
-    const userKey = getStoredApiKey();
 
     let options = {};
+
+    /*
+     * PDF / IMAGE UPLOAD
+     */
 
     if (file) {
       const formData = new FormData();
@@ -97,15 +187,17 @@ export const api = {
         formData.append('text', text);
       }
 
-      if (userKey) {
-        formData.append('apiKey', userKey);
-      }
-
       options = {
         method: 'POST',
         body: formData,
       };
-    } else {
+    }
+
+    /*
+     * TEXT RESUME
+     */
+
+    else {
       options = {
         method: 'POST',
         headers: {
@@ -114,58 +206,74 @@ export const api = {
         body: JSON.stringify({
           text,
           intensity,
-          apiKey: userKey,
         }),
       };
     }
 
-    const data = await safeFetch(`${apiBase}/roast`, options);
+    const data = await safeFetch(
+      `${apiBase}/roast`,
+      options
+    );
 
     return data.data;
   },
 
-  /**
-   * Fetch recent roasts
-   */
+  /* =========================
+     GET ROAST HISTORY
+  ========================= */
+
   async getRoasts(limit = 15) {
-    const apiBase = getApiBase();
-
     const data = await safeFetch(
-      `${apiBase}/roasts?limit=${limit}`
+      `${getApiBase()}/roasts?limit=${limit}`,
+      {
+        method: 'GET',
+      }
     );
 
     return data.data;
   },
 
-  /**
-   * Fetch a single roast
-   */
+  /* =========================
+     GET SINGLE ROAST
+  ========================= */
+
   async getRoastById(id) {
-    const apiBase = getApiBase();
-
     const data = await safeFetch(
-      `${apiBase}/roasts/${id}`
+      `${getApiBase()}/roasts/${id}`,
+      {
+        method: 'GET',
+      }
     );
 
     return data.data;
   },
 
-  /**
-   * Check backend health
-   */
-  async checkHealth() {
-    const apiBase = getApiBase();
+  /* =========================
+     HEALTH CHECK
+  ========================= */
 
+  async checkHealth() {
     try {
-      const response = await fetch(`${apiBase}/health`);
+      const response = await fetch(
+        `${getApiBase()}/health`
+      );
+
       const rawText = await response.text();
 
       if (!rawText) {
-        return { status: 'offline' };
+        return {
+          status: 'offline',
+        };
       }
 
       return JSON.parse(rawText);
-    } catch {
+
+    } catch (error) {
+      console.error(
+        '[Health Check Error]:',
+        error
+      );
+
       return {
         status: 'offline',
         isPostgresConnected: false,

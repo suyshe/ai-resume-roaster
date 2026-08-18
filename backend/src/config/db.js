@@ -59,86 +59,131 @@ export function getDbStatus() {
 }
 
 export const RoastModel = {
-  async create(data) {
-    if (isPostgresConnected) {
-      try {
-        const query = `
-          INSERT INTO roasts (
-            title, target_role, intensity, input_type, raw_text,
-            savage_roast, one_liner, overall_score, buzzword_score,
-            design_score, credibility_score, red_flags, bullet_rewrites,
-            actionable_tips, rewritten_summary
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-          RETURNING *;
-        `;
-        const values = [
-          data.title || 'Candidate Resume',
-          data.target_role || 'General Candidate',
-          data.intensity || 'spicy',
-          data.input_type || 'text',
-          data.raw_text ? data.raw_text.substring(0, 10000) : null,
-          data.savage_roast,
-          data.one_liner || '',
-          data.overall_score ?? 50,
-          data.buzzword_score ?? 70,
-          data.design_score ?? 60,
-          data.credibility_score ?? 65,
-          JSON.stringify(data.red_flags || []),
-          JSON.stringify(data.bullet_rewrites || []),
-          JSON.stringify(data.actionable_tips || []),
-          data.rewritten_summary || ''
-        ];
-        const res = await pool.query(query, values);
-        return res.rows[0];
-      } catch (err) {
-        console.warn('[PostgreSQL Insert Note]: Falling back to local storage.');
-      }
+ async create(data) {
+  if (isPostgresConnected) {
+    try {
+      const query = `
+        INSERT INTO roasts (
+          user_id,
+          title,
+          target_role,
+          intensity,
+          input_type,
+          raw_text,
+          savage_roast,
+          one_liner,
+          overall_score,
+          buzzword_score,
+          design_score,
+          credibility_score,
+          red_flags,
+          bullet_rewrites,
+          actionable_tips,
+          rewritten_summary
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8,
+          $9, $10, $11, $12, $13, $14, $15, $16
+        )
+        RETURNING *;
+      `;
+
+      const values = [
+        data.user_id,
+        data.title || 'Candidate Resume',
+        data.target_role || 'General Candidate',
+        data.intensity || 'spicy',
+        data.input_type || 'text',
+        data.raw_text
+          ? data.raw_text.substring(0, 10000)
+          : null,
+        data.savage_roast,
+        data.one_liner || '',
+        data.overall_score ?? 50,
+        data.buzzword_score ?? 70,
+        data.design_score ?? 60,
+        data.credibility_score ?? 65,
+        JSON.stringify(data.red_flags || []),
+        JSON.stringify(data.bullet_rewrites || []),
+        JSON.stringify(data.actionable_tips || []),
+        data.rewritten_summary || ''
+      ];
+
+      const res = await pool.query(query, values);
+
+      return res.rows[0];
+
+    } catch (err) {
+      console.error('[PostgreSQL Insert Error]:', err);
+      throw err;
     }
+  }
 
-    const newRecord = {
-      id: inMemoryRoasts.length + 1,
-      title: data.title || 'Candidate Resume',
-      target_role: data.target_role || 'General Candidate',
-      intensity: data.intensity || 'spicy',
-      input_type: data.input_type || 'text',
-      raw_text: data.raw_text,
-      savage_roast: data.savage_roast,
-      one_liner: data.one_liner,
-      overall_score: data.overall_score ?? 50,
-      buzzword_score: data.buzzword_score ?? 70,
-      design_score: data.design_score ?? 60,
-      credibility_score: data.credibility_score ?? 65,
-      red_flags: data.red_flags || [],
-      bullet_rewrites: data.bullet_rewrites || [],
-      actionable_tips: data.actionable_tips || [],
-      rewritten_summary: data.rewritten_summary || '',
-      created_at: new Date().toISOString()
-    };
-    inMemoryRoasts.unshift(newRecord);
-    return newRecord;
-  },
+  const newRecord = {
+    id: inMemoryRoasts.length + 1,
+    user_id: data.user_id,
+    title: data.title || 'Candidate Resume',
+    target_role: data.target_role || 'General Candidate',
+    intensity: data.intensity || 'spicy',
+    input_type: data.input_type || 'text',
+    raw_text: data.raw_text,
+    savage_roast: data.savage_roast,
+    one_liner: data.one_liner,
+    overall_score: data.overall_score ?? 50,
+    buzzword_score: data.buzzword_score ?? 70,
+    design_score: data.design_score ?? 60,
+    credibility_score: data.credibility_score ?? 65,
+    red_flags: data.red_flags || [],
+    bullet_rewrites: data.bullet_rewrites || [],
+    actionable_tips: data.actionable_tips || [],
+    rewritten_summary: data.rewritten_summary || '',
+    created_at: new Date().toISOString()
+  };
 
-  async getAll(limit = 20) {
+  inMemoryRoasts.unshift(newRecord);
+
+  return newRecord;
+},
+
+  async getAll(userId, limit = 20) {
     if (isPostgresConnected) {
       try {
-        const res = await pool.query('SELECT * FROM roasts ORDER BY created_at DESC LIMIT $1', [limit]);
+       const res = await pool.query(
+  `SELECT *
+   FROM roasts
+   WHERE user_id = $1
+   ORDER BY created_at DESC
+   LIMIT $2`,
+  [userId, limit]
+);
         return res.rows;
       } catch (err) {
         console.warn('[PostgreSQL Fetch Note]:', err.message);
       }
     }
-    return inMemoryRoasts.slice(0, limit);
+    return inMemoryRoasts
+  .filter((roast) => String(roast.user_id) === String(userId))
+  .slice(0, limit);
   },
 
-  async getById(id) {
+  async getById(id, userId) {
     if (isPostgresConnected) {
       try {
-        const res = await pool.query('SELECT * FROM roasts WHERE id = $1', [id]);
+        const res = await pool.query(
+  'SELECT * FROM roasts WHERE id = $1 AND user_id = $2',
+  [id, userId]
+);
         if (res.rows.length > 0) return res.rows[0];
       } catch (err) {
         console.warn('[PostgreSQL Fetch By ID Note]:', err.message);
       }
     }
-    return inMemoryRoasts.find(r => String(r.id) === String(id)) || null;
+    return (
+  inMemoryRoasts.find(
+    (r) =>
+      String(r.id) === String(id) &&
+      String(r.user_id) === String(userId)
+  ) || null
+);
   }
 };
